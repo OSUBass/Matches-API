@@ -1,0 +1,20 @@
+{
+  "name": "class_sample",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "@google-cloud/datastore": "^6.2.0",
+    "axios": "^0.27.2",
+    "ejs": "^3.1.8",
+    "express": "^4.17.1",
+    "json-to-html": "0.1.2",
+    "node-json2html": "^2.2.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
