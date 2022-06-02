@@ -647,6 +647,7 @@ app.get('/user', function (req, res){
 
 /*route for creating new match*/
 app.post('/match', function (req, res) {
+    const accepts = req.accepts(['application/json']);
     jwtAuth = req.headers.authorization;
     if (jwtAuth === undefined){res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
     }else{
@@ -655,23 +656,19 @@ app.post('/match', function (req, res) {
         .then((authId) =>{
             if(authId === 401){
                 res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
-            }else{
-                if(req.body.name === undefined | req.body.league === undefined | req.body.day === undefined){
+            }else if(req.body.name === undefined | req.body.league === undefined | req.body.day === undefined){
                     res.status(400).json({"Error":"The request object is incorrect"});
-                }else{
-                    const accepts = req.accepts(['application/json']);
-                    if(!accepts){
-                        res.status(406).json({'Error':'Not Acceptable'});
-                    }else if(accepts === 'application/json'){
-                        return post_match(req.body.name, req.body.league, req.body.day, authId, req)
-                        .then((info) =>{
-                            if(info === 403){
-                                res.status(403).json({'Error': 'This gym already has a match scheduled for the day indicated'});
-                            }else{res.status(201).json(info);}
-                        });
-                    }else{ res.status(500).end()}
-                }
-            }
+            }else if(!accepts){
+                res.status(406).json({'Error':'Not Acceptable'});
+            }else if(accepts === 'application/json'){
+                return post_match(req.body.name, req.body.league, req.body.day, authId, req)
+                .then((info) =>{
+                    if(info === 403){
+                        res.status(403).json({'Error': 'This gym already has a match scheduled for the day indicated'});
+                    }else if(info === 500){res.status(500).end()}
+                    else{res.status(201).json(info);}
+                });
+            }else{ res.status(500).end()}
         });
     }
 });
@@ -689,7 +686,7 @@ app.get('/match/:match_id', function (req, res) {
           res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
         }else if(!accepts){
               res.status(406).json({'Error':'Not Acceptable'});
-        }else{
+        }else if(accepts === 'application/json'){
             return get_match(req.params.match_id, req, authId)
             .then(match => {
                 if (match === 404) {
@@ -697,18 +694,17 @@ app.get('/match/:match_id', function (req, res) {
                 }else if (match === 403){
                     res.status(403).json({ 'Error': 'Current user is not authorized'})
                 }else if( match === 500){
-                    res.status(500).end()
-                }else if(accepts === 'application/json'){
-                        res.status(200).json(match);
-                }else{res.status(500).end()}
+                    res.status(500).end()     
+                }else{res.status(200).json(match);}
             });
-        }
+        }else{res.status(500).end()}
       })
     }
 });
 
 /*route for getting all matches for logged in user*/
 app.get('/match', function (req, res) {
+    const accepts = req.accepts(['application/json']);
     jwtAuth = req.headers.authorization;
     if (jwtAuth === undefined){
         res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"});
@@ -717,17 +713,15 @@ app.get('/match', function (req, res) {
         return verify(jwtAuth).then((authId) =>{
             if(authId === 401){
                 res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"});
-            }else{
-                const accepts = req.accepts(['application/json']);
-                if(!accepts){
+            }else if(!accepts){
                     res.status(406).json({'Error':'Not Acceptable'});
-                }else if(accepts === 'application/json'){
-                    const matches = get_matches(authId, req)
+            }else if(accepts === 'application/json'){
+                return get_matches(authId, req)
                     .then((allMatches) =>{
-                        res.status(200).json(allMatches);
+                        if(allMatches === 500){res.status(500).end()}
+                        else{res.status(200).json(allMatches);}
                     });
-                }else{ res.status(500).end()}
-            }
+            }else{ res.status(500).end()}
         });
     };
 });
@@ -743,7 +737,10 @@ app.patch('/match/:match_id', function (req, res) {
         return verify(jwtAuth).then((authId) =>{
             if(authId === 401){
                 res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"});
-            }else{patch_match(req.params.match_id, req.body.name, req.body.league, req.body.day, req, authId)
+            }else if(!accepts){
+                res.status(406).json({"Error":'Not Acceptable'});
+            } else if(accepts === 'application/json'){
+                patch_match(req.params.match_id, req.body.name, req.body.league, req.body.day, req, authId)
                 .then(patch_res =>{
                     if (patch_res === 404){
                         res.status(404).json({"Error": "No match with this match_id exists"});
@@ -753,22 +750,18 @@ app.patch('/match/:match_id', function (req, res) {
                         res.status(403).json({"Error": "This gym already has a match scheduled for the day indicated"});
                     }else if(patch_res === 4030){
                         res.status(403).json({ 'Error': 'Current user is not authorized'})
-                    }else{
-                        //Request must be JSON
-                        if(!accepts){
-                            res.status(406).json({"Error":'Not Acceptable'});
-                        } else if(accepts === 'application/json'){
-                            res.status(200).json(patch_res);
-                        } else { res.status(500).end()}
-                    }
+                    }else if(patch_res === 500){
+                        res.status(500).end()
+                    }else{res.status(200).json(patch_res)} 
                 });
-            }
+            }else { res.status(500).end()}
         });
     }
 });
 
 /*route for full update of a match's properties. all properties must be listed*/
 app.put('/match/:match_id', function (req, res) {
+    const accepts = req.accepts(['application/json']);
     jwtAuth = req.headers.authorization;
     if (jwtAuth === undefined){
         res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"});
@@ -787,26 +780,22 @@ app.put('/match/:match_id', function (req, res) {
                 res.status(400).json({"Error": "The request object is incorrect"});
             }else if(req.body.name > 25 || req.body.name < 1){
                 res.status(400).json({"Error": "The request object is incorrect"});
-            }else{
-                const accepts = req.accepts(['application/json']);
-                //Request must be JSON
-                if(!accepts){
-                    res.status(406).json({'Error':'Not Acceptable'});
-                }else if(accepts === 'application/json'){
-                    put_match(req.params.match_id, req.body.name, req.body.league, req.body.day, authId, req)
-                        .then(put_res =>{
-                            if (put_res === 404){
-                                res.status(404).json({"Error": "No match with this match_id exists"});
-                            }else if (put_res === 403){
-                                res.status(403).json({"Error":"This gym already has a match scheduled for the day indicated"})
-                            }else if (put_res === 4030){
-                                res.status(403).json({ 'Error': 'Current user is not authorized'})
-                            }else{
-                                res.status(200).json(put_res);
-                            }
-                        });
-                }else { res.status(500).end()}
-            };
+            }else if(!accepts){
+                res.status(406).json({'Error':'Not Acceptable'});
+            }else if(accepts === 'application/json'){
+                put_match(req.params.match_id, req.body.name, req.body.league, req.body.day, authId, req)
+                    .then(put_res =>{
+                        if (put_res === 404){
+                            res.status(404).json({"Error": "No match with this match_id exists"});
+                        }else if (put_res === 403){
+                            res.status(403).json({"Error":"This gym already has a match scheduled for the day indicated"})
+                        }else if (put_res === 4030){
+                            res.status(403).json({ 'Error': 'Current user is not authorized'})
+                        }else if (put_res === 500){
+                            res.status(500).end()
+                        }else{res.status(200).json(put_res);}
+                    });
+            }else {res.status(500).end()}
         });
     }
 });
@@ -828,6 +817,8 @@ app.delete('/match/:match_id', function (req, res) {
                         res.status(404).json({'Error': 'No match with this match_id exists' });
                     }else if(delete_response ===403){
                         res.status(403).json({ 'Error': 'Current user is not authorized'})
+                    }else if(delete_response ===500){
+                        res.status(500).end();
                     }else{
                         res.status(204).end();
                     };
@@ -848,33 +839,46 @@ app.delete('/match', function (req, res){
 
 /*route that creates a new ref*/
 app.post('/ref', function (req, res) {
+    const accepts = req.accepts(['application/json']);
     if (req.body.fname === undefined || req.body.lname === undefined || req.body.certified === undefined || req.body.available === undefined){
         res.status(400).json({'Error': 'The request object is incorrect' });
-    } else {
-    post_ref(req.body.fname, req.body.lname, req.body.certified, req.body.available, req)
-        .then(key => { 
-            res.status(201).json(key)});
-    }
+    }else if(!accepts){
+        res.status(406).json({'Error':'Not Acceptable'});
+    }else if(accepts){
+        post_ref(req.body.fname, req.body.lname, req.body.certified, req.body.available, req)
+            .then(key => {
+                res.status(201).json(key)});
+    }else{res.status(500).end()}
 });
 
 /*route that gets a specific ref or indicates that ref_id does not exist*/
 app.get('/ref/:ref_id', function (req, res) {
-    get_ref(req.params.ref_id, req)
-    .then(load => {
-        if (load === 404){
-            res.status(404).json({ 'Error': 'No ref with this ref_id exists' });
-        } else {
-            res.status(200).json(load[0]);
-        }
-    });
+    const accepts = req.accepts(['application/json']);
+    if(!accepts){
+        res.status(406).json({'Error':'Not Acceptable'});
+    }else if(accepts){
+        get_ref(req.params.ref_id, req)
+        .then(load => {
+            if (load === 404){
+                res.status(404).json({ 'Error': 'No ref with this ref_id exists' });
+            } else {
+                res.status(200).json(load[0]);
+            }
+        });
+    }else{res.status(500).end()}
 });
 
 /*route that lists all refs*/
 app.get('/ref', function (req, res) {
-    const allRefs = get_all_refs(req)
-    .then((allRefs) => {
-        res.status(200).json(allRefs);
-    });
+    const accepts = req.accepts(['application/json']);
+    if(!accepts){
+        res.status(406).json({'Error':'Not Acceptable'});
+    }else if(accepts){
+        const allRefs = get_all_refs(req)
+        .then((allRefs) => {
+            res.status(200).json(allRefs);
+        });
+    }else{res.status(500).end()}
 });
 
 /*route for partial updating of ref's properties.*/
@@ -882,51 +886,45 @@ app.patch('/ref/:ref_id', function (req, res) {
     const accepts = req.accepts(['application/json']);
     if(req.get('content-type') !== 'application/json'){
         res.status(415).send('Server only accepts application/json data.')
-    }else{
+    }else if(!accepts){
+        res.status(406).json({"Error":'Not Acceptable'});
+    }else if(accepts === 'application/json'){
         patch_ref(req.params.ref_id, req.body.fname, req.body.lname, req.body.certified, req.body.available, req)
-        .then(patch_res =>{
+        .then((patch_res) =>{
             if (patch_res === 404){
                 res.status(404).json({"Error": "No ref with this ref_id exists"});
             }else if(patch_res === 400){
                 res.status(400).json({"Error": "The request object is incorrect"});
-            }else{
-                //Request must be JSON
-                if(!accepts){
-                    res.status(406).json({"Error":'Not Acceptable'});
-                } else if(accepts === 'application/json'){
-                    res.status(200).json(patch_res);
-                } else { res.status(500).end()}
-            }
+            }else if(patch_res ===500){
+                res.status(500).end()
+            }else{res.status(200).json(patch_res);}
         });
-    }
+    }else{res.status(500).end()}
 });
 
 /*route for full update of a ref's properties. all properties must be listed*/
 app.put('/ref/:ref_id', function (req, res) {
+    const accepts = req.accepts(['application/json']);
     if(req.get('content-type') !== 'application/json'){
         res.status(415).json({'Error':'Server only accepts application/json data.'})
+    }else if(!accepts){
+        res.status(406).json({'Error':'Not Acceptable'});
     }else if (req.body.fname === undefined || req.body.lname === undefined || req.body.certified === undefined || req.body.available === undefined){
         res.status(400).json({"Error": "The request object is incorrect"});
     }else if(req.body.lname > 15 || req.body.lname < 1){
         res.status(400).json({"Error": "The request object is incorrect"});
     }else if(req.body.fname > 15 || req.body.fname < 1){
         res.status(400).json({"Error": "The request object is incorrect"});
-    }else{
-        const accepts = req.accepts(['application/json']);
-        //Request must be JSON
-        if(!accepts){
-            res.status(406).json({'Error':'Not Acceptable'});
-        }else if(accepts === 'application/json'){
-            put_ref(req.params.ref_id, req.body.fname, req.body.lname, req.body.certified, req.body.available, req)
-            .then(put_res =>{
-                if (put_res === 404){
-                    res.status(404).json({"Error": "No ref with this ref_id exists"});
-                }else{
-                    res.status(200).json(put_res);
-                }
-            });
-        }else { res.status(500).end()}
-    };
+    }else if(accepts === 'application/json'){
+        put_ref(req.params.ref_id, req.body.fname, req.body.lname, req.body.certified, req.body.available, req)
+        .then(put_res =>{
+            if (put_res === 404){
+                res.status(404).json({"Error": "No ref with this ref_id exists"});
+            }else if(put_res === 500){
+                res.status(500).end()
+            }else{res.status(200).json(put_res);}
+        });
+    }else {res.status(500).end()}
 });
 
 /*Deletes ref with specified Id*/
@@ -934,7 +932,7 @@ app.delete('/ref/:ref_id', function (req, res) {
     delete_ref(req.params.ref_id).then(ref =>{
         if (ref === 404) {
             res.status(404).json({'Error': 'No ref with this ref_id exists' });
-        } else {
+        }else{
             res.status(204).end()
         }
     })
@@ -952,6 +950,7 @@ app.delete('/ref', function (req, res){
 
 /*Assigns a ref to a match*/
 app.put('/match/:match_id/:ref_id', function (req, res) {
+    const accepts = req.accepts(['application/json']);
     jwtAuth = req.headers.authorization;
     if (jwtAuth === undefined){res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
     }else{
@@ -961,18 +960,18 @@ app.put('/match/:match_id/:ref_id', function (req, res) {
         .then((authId) =>{
             if(authId === 401){
                 res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
-            }else{
+            }else if(!accepts){
+                res.status(406).json({"Error":'Not Acceptable'});
+            }else if(accepts === 'application/json'){
                 put_ref_on_match(req.params.match_id, req.params.ref_id, req)
-                    .then(result => {
-                        if (result === 404) {
-                            res.status(404).json({ 'Error': 'The specified match and/or ref does not exist' })
-                        }else if(result === 403) {
-                            res.status(403).json({ 'Error': 'The ref is unavailable or max refs have already been reached for this match'}) 
-                        }else{
-                            res.status(200).json(result)
-                        }
-                    });
-            }
+                .then(result => {
+                    if (result === 404) {
+                        res.status(404).json({ 'Error': 'The specified match and/or ref does not exist' })
+                    }else if(result === 403) {
+                        res.status(403).json({ 'Error': 'The ref is unavailable or max refs have already been reached for this match'}) 
+                    }else{res.status(200).json(result)}
+                });
+            }else{res.status(500).end()}
         })
     }
 });
@@ -980,15 +979,15 @@ app.put('/match/:match_id/:ref_id', function (req, res) {
 /*deletes specific ref_id from a match*/
 app.delete('/match/:match_id/:ref_id', function (req, res) {
     jwtAuth = req.headers.authorization;
-    if (jwtAuth === undefined){res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
+    if (jwtAuth === undefined){
+        res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
     }else{
-        //remove "bearer" from front of header
-        jwtAuth = jwtAuth.slice(7);
+        jwtAuth = jwtAuth.slice(7); //remove "bearer" from front of header
         return verify(jwtAuth)
         .then((authId) =>{
             if(authId === 401){
                 res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
-            }else{
+            }else if (authID !== 401){
                 delete_ref_from_match(req.params.match_id, req.params.ref_id, true)
                 .then(result => {
                     if (result === 404) {
@@ -999,7 +998,7 @@ app.delete('/match/:match_id/:ref_id', function (req, res) {
                         res.status(204).end()
                     }
                 });
-            }
+            }else{res.status(500).end()}
         })
     }
 });
@@ -1039,10 +1038,15 @@ app.get('/match/:match_id/ref', function (req,res){
 
 /*route that lists all users (gym managers)*/
 app.get('/users', function (req, res) {
-    const allUsers = get_all_users(req)
-    .then((allUsers) => {
-        res.status(200).json(allUsers);
-    });
+    const accepts = req.accepts(['application/json']);
+    if(!accepts){
+        res.status(406).json({"Error":'Not Acceptable'});
+    }else if(accepts === 'application/json'){
+        get_all_users(req)
+        .then((allUsers) => {
+            res.status(200).json(allUsers);
+        });
+    }else{res.status(500).end()}
 });
 
 
