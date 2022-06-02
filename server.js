@@ -20,8 +20,8 @@ const clientSecretData = require('./client_secret.json');
 const clientID = clientSecretData.web.client_id;
 const clientSecret = clientSecretData.web.client_secret;
 
-//const redirectU = 'https://assign7-350122.uc.r.appspot.com/oauth';
-const redirectU = 'http://localhost:8080/oauth';
+const redirectU = 'https://cloudport-351121.uw.r.appspot.com/oauth';
+//const redirectU = 'http://localhost:8080/oauth';
 
 const {OAuth2Client} = require('google-auth-library');
 const { match } = require('assert');
@@ -987,7 +987,7 @@ app.delete('/match/:match_id/:ref_id', function (req, res) {
         .then((authId) =>{
             if(authId === 401){
                 res.status(401).json({"Error": "Authorization Token is Incorrect/Expired/Missing"})
-            }else if (authID !== 401){
+            }else if (authId !== 401){
                 delete_ref_from_match(req.params.match_id, req.params.ref_id, true)
                 .then(result => {
                     if (result === 404) {
